@@ -1,7 +1,5 @@
 """
-Sample script that lists all units (as well as their byte sizes) present in the currently opened JEB project .
-
-Refer to SCRIPTS.TXT for more information.
+extract apk's resource files
 """
 
 import os
@@ -9,8 +7,9 @@ from com.pnfsoftware.jeb.client.api import IScript
 from com.pnfsoftware.jeb.core.units import IBinaryUnit, IXmlUnit
 from com.pnfsoftware.jeb.core.units.code import ICodeUnit, ICodeItem
 from com.pnfsoftware.jeb.core.output.text import ITextDocument
+from jarray import array, zeros
 
-class JEB2ListUnits(IScript):
+class JEB2ExtractResources(IScript):
 
   def run(self, ctx):
     self.ctx = ctx
@@ -27,9 +26,15 @@ class JEB2ListUnits(IScript):
 
     prj = projects[0]
     print('=> Listing units int project "%s":' % prj.getName())
+    prjname = prj.getName()
+    outdir = os.path.join(prjname[:prjname.rfind('/') + 1], 'resources')
+    print('=> outdir "%s":' % outdir)
+
     for art in prj.getLiveArtifacts():
       for unit in art.getUnits():
-        self.checkUnit(unit)
+        self.checkUnit(unit, outdir)
+
+    print('---- extracted over ----');
 
   def getTextDocument(self, srcUnit):
     formatter = srcUnit.getFormatter()
@@ -48,7 +53,7 @@ class JEB2ListUnits(IScript):
       s += line.getText().toString() + '\n'
     return s
 
-  def checkUnit(self, unit, level=0, outdir="/Users/prife/tools/jeb2.2.7/scripts"):
+  def checkUnit(self, unit, outdir, level=0):
     unitsize = -1
     if isinstance(unit, IBinaryUnit):
       unitinput = unit.getInput()
@@ -72,8 +77,19 @@ class JEB2ListUnits(IScript):
         f = open(filepath, 'w')
         f.write(text.encode('utf-8'))
         f.close()
-        print("-> %s" %filepath)
-    print(s)
+        #print("-> %s" %filepath)
+      elif not unit.getChildren():
+        filepath = os.path.join(outdir, unit.getName())
+        print("-> %s : %d bytes" %(filepath, unitsize))
+        srcfile = unitinput.getStream()
+        length = srcfile.available();
+        buff = zeros(length, 'b')
+        f = open(filepath, 'wb')
+        srcfile.read(buff)
+        f.write(buff)
+        f.close()
+
+    #print(s)
 
     # recurse over children units
     if unit.getChildren():
@@ -82,4 +98,4 @@ class JEB2ListUnits(IScript):
         os.makedirs(nextdir)
 
       for c in unit.getChildren():
-        self.checkUnit(c, level + 1, nextdir)
+        self.checkUnit(c, nextdir, level + 1)
